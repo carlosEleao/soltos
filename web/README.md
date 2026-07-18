@@ -5,9 +5,14 @@ App Next.js multi-user: conecte prefeitura (Betha) com login embutido, salve a s
 ## Fluxo
 
 1. Criar conta (`/register`)
-2. No painel, conectar cidade (login embutido Betha — senha **não** é persistida)
+2. No painel, conectar **prefeitura / energia / internet** (login embutido — senha **não** é persistida)
 3. Gerar link MCP (token mostrado uma vez)
 4. Colar a URL no agente (`/api/mcp/<token>`)
+
+Provedores:
+- `betha-prefeitura` — Protocolo Betha Cloud
+- `energia` — RGE/CPFL, Equatorial/CEEE ou URL customizada
+- `internet` — Vivo, Claro/NET, Oi ou provedor local (URL customizada)
 
 ## Segurança da sessão do provedor
 
@@ -58,7 +63,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
 - `listar_conexoes`
 - `listar_tickets`
-- `cadastrar_ticket`
+- `cadastrar_ticket` / `abrir_ticket`
 - `sincronizar_conexao`
 - `provedores_disponiveis`
 - `link_mcp`

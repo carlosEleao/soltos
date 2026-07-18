@@ -75,9 +75,12 @@ export function createUserMcpServer(userId: string): McpServer {
   server.registerTool(
     "cadastrar_ticket",
     {
-      description: "Cadastra um ticket/protocolo manualmente na conta do usuário.",
+      description:
+        "Cadastra/abre um ticket ou protocolo na conta do usuário (prefeitura, energia ou internet).",
       inputSchema: {
-        providerKey: z.string().default("betha-prefeitura"),
+        providerKey: z
+          .enum(["betha-prefeitura", "energia", "internet"])
+          .default("betha-prefeitura"),
         externalId: z.string(),
         year: z.number().int().optional(),
         digit: z.string().optional(),
@@ -103,7 +106,7 @@ export function createUserMcpServer(userId: string): McpServer {
           year: input.year ?? null,
           digit: input.digit ?? null,
           title: input.title ?? null,
-          status: input.status ?? null,
+          status: input.status ?? "aberto",
           notes: input.notes ?? null,
         },
         update: {
@@ -114,6 +117,59 @@ export function createUserMcpServer(userId: string): McpServer {
         },
       });
       return { content: [{ type: "text", text: json({ ok: true, ticket }) }] };
+    },
+  );
+
+  server.registerTool(
+    "abrir_ticket",
+    {
+      description:
+        "Alias de cadastrar_ticket: registra um chamado local vinculado ao provedor (para o agente abrir tickets).",
+      inputSchema: {
+        providerKey: z.enum(["betha-prefeitura", "energia", "internet"]),
+        externalId: z.string(),
+        year: z.number().int().optional(),
+        title: z.string().optional(),
+        notes: z.string().optional(),
+      },
+    },
+    async (input) => {
+      const ticket = await prisma.ticket.upsert({
+        where: {
+          userId_providerKey_externalId_year: {
+            userId,
+            providerKey: input.providerKey,
+            externalId: input.externalId,
+            year: input.year ?? 0,
+          },
+        },
+        create: {
+          userId,
+          providerKey: input.providerKey,
+          externalId: input.externalId,
+          year: input.year ?? null,
+          title: input.title ?? null,
+          status: "aberto",
+          notes: input.notes ?? null,
+        },
+        update: {
+          title: input.title ?? undefined,
+          notes: input.notes ?? undefined,
+          status: "aberto",
+        },
+      });
+      return {
+        content: [
+          {
+            type: "text",
+            text: json({
+              ok: true,
+              ticket,
+              tip: "Ticket local registrado. Use sincronizar_conexao após abrir no portal oficial, se houver número definitivo.",
+            }),
+          },
+        ],
+      };
     },
   );
 

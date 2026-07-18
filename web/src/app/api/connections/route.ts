@@ -35,6 +35,7 @@ const connectSchema = z.object({
   login: z.string().min(3),
   password: z.string().min(1),
   cityOrEntity: z.string().optional(),
+  portalUrl: z.string().url().optional(),
 });
 
 export async function POST(req: Request) {

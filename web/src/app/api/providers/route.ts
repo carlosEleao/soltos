@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { listProviders, upcomingProviders } from "@/lib/providers/registry";
+import { listProviders } from "@/lib/providers/registry";
 
 export async function GET() {
   const session = await auth();
@@ -15,7 +15,7 @@ export async function GET() {
       name: p.name,
       description: p.description,
       entities: p.entities ?? [],
+      allowsCustomPortal: (p.entities ?? []).some((e) => e.id === "custom"),
     })),
-    upcoming: upcomingProviders,
   });
 }

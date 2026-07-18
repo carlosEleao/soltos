@@ -46,6 +46,7 @@ export async function connectProvider(params: {
   login: string;
   password: string;
   cityOrEntity?: string;
+  portalUrl?: string;
 }) {
   const provider = getProvider(params.providerKey);
   if (!provider) {
@@ -56,6 +57,7 @@ export async function connectProvider(params: {
     login: params.login,
     password: params.password,
     cityOrEntity: params.cityOrEntity,
+    portalUrl: params.portalUrl,
   });
 
   if (!result.ok || !result.session) {
@@ -64,6 +66,10 @@ export async function connectProvider(params: {
 
   const cityOrEntity = result.cityOrEntity ?? params.cityOrEntity ?? "default";
   const blob = encryptSession(result.session);
+  const metadata = {
+    loginHint: result.session.meta?.loginHint ?? null,
+    portalUrl: result.session.meta?.portalUrl ?? params.portalUrl ?? null,
+  };
 
   const connection = await prisma.connection.upsert({
     where: {
@@ -85,7 +91,7 @@ export async function connectProvider(params: {
       sessionTag: blob.tag,
       sessionSalt: blob.salt,
       sessionUpdatedAt: new Date(),
-      metadata: { loginHint: result.session.meta?.loginHint ?? null },
+      metadata,
     },
     update: {
       displayName: result.displayName ?? provider.name,
@@ -96,7 +102,7 @@ export async function connectProvider(params: {
       sessionSalt: blob.salt,
       sessionUpdatedAt: new Date(),
       lastError: null,
-      metadata: { loginHint: result.session.meta?.loginHint ?? null },
+      metadata,
     },
   });
 

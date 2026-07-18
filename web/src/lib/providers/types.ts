@@ -22,6 +22,8 @@ export type ConnectInput = {
   login: string;
   password: string;
   cityOrEntity?: string;
+  /** Optional override for generic portals (energia/internet custom) */
+  portalUrl?: string;
 };
 
 export type ConnectResult = {
@@ -39,13 +41,19 @@ export type SyncResult = {
   needsReconnect?: boolean;
 };
 
+export type ProviderEntity = {
+  id: string;
+  label: string;
+  portalUrl?: string;
+};
+
 export interface ProviderAdapter {
   key: string;
   kind: ProviderKind;
   name: string;
   description: string;
   /** Cities/entities available for this provider (optional) */
-  entities?: { id: string; label: string }[];
+  entities?: ProviderEntity[];
   connect(input: ConnectInput): Promise<ConnectResult>;
   sync(session: ProviderSession): Promise<SyncResult>;
 }

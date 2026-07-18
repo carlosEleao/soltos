@@ -16,7 +16,7 @@ export default async function HomePage() {
         Seus protocolos no agente
       </h1>
       <p className="muted" style={{ maxWidth: "52ch", fontSize: "1.15rem", lineHeight: 1.5 }}>
-        Crie uma conta, conecte a prefeitura (e em breve energia/internet) com login embutido,
+        Crie uma conta, conecte prefeitura, energia ou internet com login embutido,
         e gere um link MCP para o ChatGPT ou Cursor acompanhar e abrir tickets.
       </p>
       <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.75rem", flexWrap: "wrap" }}>
@@ -38,7 +38,7 @@ export default async function HomePage() {
       >
         {[
           ["1. Conta", "Cadastro simples com email e senha."],
-          ["2. Conectar cidade", "Login embutido na Betha; sessão fica criptografada."],
+          ["2. Conectar provedor", "Prefeitura, energia ou internet — sessão criptografada."],
           ["3. Link MCP", "Cole no ChatGPT/Cursor e peça status ou sync."],
         ].map(([title, text]) => (
           <div className="card" key={title}>

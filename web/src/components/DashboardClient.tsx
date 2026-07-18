@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
 
@@ -32,11 +32,15 @@ type McpToken = {
   createdAt: string;
 };
 
+type ProviderEntity = { id: string; label: string; portalUrl?: string };
+
 type Provider = {
   key: string;
+  kind: string;
   name: string;
   description: string;
-  entities: { id: string; label: string }[];
+  entities: ProviderEntity[];
+  allowsCustomPortal?: boolean;
 };
 
 export function DashboardClient({ userEmail }: { userEmail: string }) {
@@ -44,9 +48,19 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [tokens, setTokens] = useState<McpToken[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
+  const [providerKey, setProviderKey] = useState("betha-prefeitura");
+  const [entityId, setEntityId] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [freshMcpUrl, setFreshMcpUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const selectedProvider = useMemo(
+    () => providers.find((p) => p.key === providerKey) ?? providers[0],
+    [providers, providerKey],
+  );
+
+  const entities = selectedProvider?.entities ?? [];
+  const needsCustomPortal = entityId === "custom" || selectedProvider?.allowsCustomPortal && entityId === "custom";
 
   const reload = useCallback(async () => {
     const [c, t, m, p] = await Promise.all([
@@ -58,18 +72,31 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
     setConnections(c.connections ?? []);
     setTickets(t.tickets ?? []);
     setTokens(m.tokens ?? []);
-    setProviders(p.providers ?? []);
-  }, []);
+    const nextProviders: Provider[] = p.providers ?? [];
+    setProviders(nextProviders);
+    if (nextProviders.length && !nextProviders.some((x) => x.key === providerKey)) {
+      setProviderKey(nextProviders[0].key);
+    }
+  }, [providerKey]);
 
   useEffect(() => {
     reload().catch((e) => setMsg(String(e)));
   }, [reload]);
+
+  useEffect(() => {
+    if (!selectedProvider) return;
+    const first = selectedProvider.entities[0]?.id ?? "";
+    if (!selectedProvider.entities.some((e) => e.id === entityId)) {
+      setEntityId(first);
+    }
+  }, [selectedProvider, entityId]);
 
   async function onConnect(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
     setMsg("Conectando… isso pode levar até 1 minuto.");
     const fd = new FormData(e.currentTarget);
+    const portalUrl = String(fd.get("portalUrl") || "").trim();
     try {
       const res = await fetch("/api/connections", {
         method: "POST",
@@ -79,6 +106,7 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
           cityOrEntity: fd.get("cityOrEntity"),
           login: fd.get("login"),
           password: fd.get("password"),
+          ...(portalUrl ? { portalUrl } : {}),
         }),
       });
       const data = await res.json();
@@ -132,7 +160,41 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
     await reload();
   }
 
-  const betha = providers.find((p) => p.key === "betha-prefeitura");
+  async function onCreateTicket(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setBusy(true);
+    const fd = new FormData(e.currentTarget);
+    try {
+      const yearRaw = String(fd.get("year") || "").trim();
+      const res = await fetch("/api/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          providerKey: fd.get("providerKey"),
+          externalId: fd.get("externalId"),
+          year: yearRaw ? Number(yearRaw) : undefined,
+          digit: String(fd.get("digit") || "") || undefined,
+          title: String(fd.get("title") || "") || undefined,
+          status: String(fd.get("status") || "") || undefined,
+          notes: String(fd.get("notes") || "") || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Falha ao salvar");
+      setMsg("Ticket cadastrado");
+      e.currentTarget.reset();
+      await reload();
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : "Erro");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const loginLabel =
+    selectedProvider?.kind === "PREFEITURA"
+      ? "Usuário / email Betha"
+      : "Usuário / CPF / email do portal";
 
   return (
     <div className="stack" style={{ gap: "1.25rem" }}>
@@ -166,47 +228,68 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
 
       <section className="card stack">
         <h2 className="brand" style={{ margin: 0, fontSize: "1.4rem" }}>
-          Conectar cidade / provedor
+          Conectar provedor
         </h2>
         <p className="muted" style={{ margin: 0 }}>
-          Login embutido: usamos suas credenciais só para autenticar no provedor e gravar a sessão
-          criptografada (AES-256-GCM). A senha do provedor não é salva.
+          Prefeitura, energia ou internet. Login embutido: a senha do provedor não é salva — só a
+          sessão criptografada (AES-256-GCM).
         </p>
         <form className="stack" onSubmit={onConnect}>
           <label className="label">
             Provedor
-            <select className="input" name="providerKey" defaultValue="betha-prefeitura" required>
-              {(providers.length ? providers : [{ key: "betha-prefeitura", name: "Betha" }]).map(
-                (p) => (
-                  <option key={p.key} value={p.key}>
-                    {p.name}
-                  </option>
-                ),
-              )}
+            <select
+              className="input"
+              name="providerKey"
+              required
+              value={providerKey}
+              onChange={(e) => setProviderKey(e.target.value)}
+            >
+              {providers.map((p) => (
+                <option key={p.key} value={p.key}>
+                  {p.name}
+                </option>
+              ))}
             </select>
           </label>
+          {selectedProvider?.description && (
+            <p className="muted" style={{ margin: 0, fontSize: "0.9rem" }}>
+              {selectedProvider.description}
+            </p>
+          )}
           <label className="label">
-            Cidade / entidade
+            Entidade / cidade / empresa
             <select
               className="input"
               name="cityOrEntity"
-              defaultValue={betha?.entities?.[0]?.id ?? "estancia-velha-rs"}
+              required
+              value={entityId}
+              onChange={(e) => setEntityId(e.target.value)}
             >
-              {(betha?.entities ?? [{ id: "estancia-velha-rs", label: "Estância Velha / RS" }]).map(
-                (e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.label}
-                  </option>
-                ),
-              )}
+              {entities.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.label}
+                </option>
+              ))}
             </select>
           </label>
+          {needsCustomPortal && (
+            <label className="label">
+              URL do portal (login)
+              <input
+                className="input"
+                name="portalUrl"
+                type="url"
+                required
+                placeholder="https://portal.seuprovedor.com.br/login"
+              />
+            </label>
+          )}
           <label className="label">
-            Usuário / email Betha
+            {loginLabel}
             <input className="input" name="login" required autoComplete="username" />
           </label>
           <label className="label">
-            Senha Betha
+            Senha do portal
             <input
               className="input"
               name="password"
@@ -240,7 +323,7 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
               {c.displayName} · {c.cityOrEntity}
             </strong>
             <span className="muted">
-              {c.status}
+              {c.providerKey} · {c.status}
               {c.lastSyncAt ? ` · sync ${new Date(c.lastSyncAt).toLocaleString("pt-BR")}` : ""}
             </span>
             {c.lastError && <span style={{ color: "var(--danger)" }}>{c.lastError}</span>}
@@ -318,9 +401,56 @@ export function DashboardClient({ userEmail }: { userEmail: string }) {
 
       <section className="card stack">
         <h2 className="brand" style={{ margin: 0, fontSize: "1.4rem" }}>
+          Cadastrar ticket / protocolo
+        </h2>
+        <form className="stack" onSubmit={onCreateTicket}>
+          <label className="label">
+            Provedor
+            <select className="input" name="providerKey" defaultValue={providerKey}>
+              {providers.map((p) => (
+                <option key={p.key} value={p.key}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.75rem" }}>
+            <label className="label">
+              Número
+              <input className="input" name="externalId" required placeholder="1234" />
+            </label>
+            <label className="label">
+              Ano
+              <input className="input" name="year" type="number" placeholder="2026" />
+            </label>
+            <label className="label">
+              Dígito
+              <input className="input" name="digit" placeholder="opcional" />
+            </label>
+          </div>
+          <label className="label">
+            Assunto
+            <input className="input" name="title" placeholder="resumo" />
+          </label>
+          <label className="label">
+            Status
+            <input className="input" name="status" placeholder="aberto, em análise…" />
+          </label>
+          <label className="label">
+            Notas
+            <input className="input" name="notes" placeholder="lembrete interno" />
+          </label>
+          <button className="btn btn-primary" disabled={busy} type="submit">
+            Salvar ticket
+          </button>
+        </form>
+      </section>
+
+      <section className="card stack">
+        <h2 className="brand" style={{ margin: 0, fontSize: "1.4rem" }}>
           Tickets / protocolos
         </h2>
-        {!tickets.length && <p className="muted">Nenhum ticket ainda. Conecte e sincronize.</p>}
+        {!tickets.length && <p className="muted">Nenhum ticket ainda. Conecte, sincronize ou cadastre.</p>}
         {tickets.map((t) => (
           <div key={t.id} style={{ borderTop: "1px solid var(--line)", paddingTop: "0.75rem" }}>
             <strong>
