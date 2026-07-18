@@ -1,0 +1,100 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  name         String?
+  passwordHash String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  connections  Connection[]
+  mcpTokens    McpToken[]
+  tickets      Ticket[]
+}
+
+enum ProviderKind {
+  PREFEITURA
+  ENERGIA
+  INTERNET
+  OTHER
+}
+
+enum ConnectionStatus {
+  PENDING
+  CONNECTED
+  ERROR
+  DISCONNECTED
+}
+
+model Connection {
+  id                   String           @id @default(cuid())
+  userId               String
+  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providerKey          String
+  providerKind         ProviderKind
+  displayName          String
+  cityOrEntity         String?
+  status               ConnectionStatus @default(PENDING)
+  /// AES-256-GCM ciphertext (base64) of provider session JSON
+  encryptedSession     String?
+  /// IV (base64)
+  sessionIv            String?
+  /// Auth tag (base64)
+  sessionTag           String?
+  /// SHA-256 of a key-derivation salt unique per connection
+  sessionSalt          String?
+  sessionUpdatedAt     DateTime?
+  lastSyncAt           DateTime?
+  lastError            String?
+  metadata             Json?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  tickets              Ticket[]
+
+  @@unique([userId, providerKey, cityOrEntity])
+  @@index([userId])
+}
+
+model McpToken {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String    @default("default")
+  /// Only a SHA-256 hash is stored — raw token shown once
+  tokenHash   String    @unique
+  tokenPrefix String
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Ticket {
+  id           String      @id @default(cuid())
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connectionId String?
+  connection   Connection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  providerKey  String
+  externalId   String
+  year         Int?
+  digit        String?
+  title        String?
+  status       String?
+  notes        String?
+  payload      Json?
+  syncedAt     DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@unique([userId, providerKey, externalId, year])
+  @@index([userId, providerKey])
+}
