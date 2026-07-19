@@ -1,0 +1,14 @@
+{
+  "name": "soltos",
+  "private": true,
+  "packageManager": "pnpm@11.1.2",
+  "scripts": {
+    "dev": "pnpm --filter civiclink-web dev",
+    "build": "pnpm --filter civiclink-web build",
+    "start": "pnpm --filter civiclink-web start",
+    "lint": "pnpm --filter civiclink-web lint",
+    "db:generate": "pnpm --filter civiclink-web db:generate",
+    "db:migrate": "pnpm --filter civiclink-web db:migrate",
+    "db:push": "pnpm --filter civiclink-web db:push"
+  },
+}

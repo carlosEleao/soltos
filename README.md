@@ -30,11 +30,23 @@ APP_URL=https://seu-dominio
 SESSION_ENCRYPTION_KEY=...   # 32 bytes base64
 ```
 
-Local com compose:
+Dev local (pnpm, na raiz do repo):
+
+```bash
+pnpm install
+pnpm --filter civiclink-web exec playwright install chromium
+cp web/.env.example web/.env   # preencha AUTH_SECRET e SESSION_ENCRYPTION_KEY
+docker compose up -d db
+pnpm db:migrate
+pnpm dev
+```
+
+Local com compose (app + postgres):
 
 ```bash
 docker compose up --build
 ```
+
 
 ## Legado
 

@@ -23,19 +23,30 @@ Provedores:
 
 ## Dev local
 
+Na raiz do repo (pnpm workspace):
+
 ```bash
 # Postgres
 docker compose up -d db
 
-cd web
-cp .env.example .env
+cp web/.env.example web/.env
 # preencha AUTH_SECRET e SESSION_ENCRYPTION_KEY (32 bytes base64)
 
-npm install
-npx prisma migrate dev
-npx playwright install chromium
-npm run dev
+pnpm install
+pnpm db:migrate
+pnpm --filter civiclink-web exec playwright install chromium
+pnpm dev
 ```
+
+Ou só dentro de `web/`:
+
+```bash
+pnpm install
+pnpm exec prisma migrate dev
+pnpm exec playwright install chromium
+pnpm dev
+```
+
 
 ## Docker / Dokploy
 

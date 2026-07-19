@@ -1,20 +1,24 @@
 # CivicLink — Next.js multi-user + Playwright (Dokploy / Docker)
-# Build context: repository root
+# Build context: repository root (pnpm workspace)
 
 FROM mcr.microsoft.com/playwright:v1.61.1-jammy AS deps
 WORKDIR /app
-COPY web/package.json web/package-lock.json ./
-RUN npm ci
+RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+COPY web/package.json ./web/
+RUN pnpm install --filter civiclink-web --frozen-lockfile
 
 FROM mcr.microsoft.com/playwright:v1.61.1-jammy AS builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY web/ ./
+RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
+COPY --from=deps /app/ ./
+COPY web/ ./web/
+WORKDIR /app/web
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 # Prisma generate does not need a live DB
-RUN npx prisma generate
-RUN npm run build
+RUN pnpm exec prisma generate
+RUN pnpm run build
 
 FROM mcr.microsoft.com/playwright:v1.61.1-jammy AS runner
 WORKDIR /app
@@ -27,11 +31,13 @@ ENV PLAYWRIGHT_HEADLESS=true
 RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder /app/web/public ./public
+COPY --from=builder /app/web/prisma ./prisma
+COPY --from=builder /app/web/package.json ./package.json
+# With outputFileTracingRoot at monorepo root, standalone nests under web/
+COPY --from=builder --chown=nextjs:nodejs /app/web/.next/standalone/web ./
+COPY --from=builder --chown=nextjs:nodejs /app/web/.next/standalone/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/web/.next/static ./.next/static
 
 # Prisma client + CLI for migrate on boot
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
