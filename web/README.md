@@ -26,9 +26,6 @@ Provedores:
 Na raiz do repo (pnpm workspace):
 
 ```bash
-# Postgres
-docker compose up -d db
-
 cp web/.env.example web/.env
 # preencha AUTH_SECRET e SESSION_ENCRYPTION_KEY (32 bytes base64)
 
@@ -38,29 +35,30 @@ pnpm --filter civiclink-web exec playwright install chromium
 pnpm dev
 ```
 
+O SQLite fica em `web/data/civiclink.db` (criado pela migration).
+
 Ou só dentro de `web/`:
 
 ```bash
 pnpm install
-pnpm exec prisma migrate dev
+pnpm exec prisma migrate deploy
 pnpm exec playwright install chromium
 pnpm dev
 ```
-
 
 ## Docker / Dokploy
 
 Na raiz do repo:
 
 - `Dockerfile` (Playwright + Next standalone)
-- `docker-compose.yml` (web + postgres)
+- `docker-compose.yml` (web + volume SQLite em `/app/data`)
 - Porta `3000`, healthcheck `/api/health`
 
 Variáveis obrigatórias no Dokploy:
 
 | Var | Descrição |
 |---|---|
-| `DATABASE_URL` | Postgres |
+| `DATABASE_URL` | SQLite, ex. `file:/app/data/civiclink.db` |
 | `AUTH_SECRET` | Secret Auth.js |
 | `AUTH_URL` / `APP_URL` | URL pública HTTPS |
 | `SESSION_ENCRYPTION_KEY` | 32 bytes em base64 |

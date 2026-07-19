@@ -11,7 +11,7 @@ Tudo vive em [`web/`](./web/):
 3. Gerar link MCP pessoal  
 4. Usar no ChatGPT / Cursor
 
-Sessões de provedor: **AES-256-GCM** at rest. Tokens MCP: só hash no banco.
+Sessões de provedor: **AES-256-GCM** at rest. Tokens MCP: só hash no banco. Persistência: **SQLite**.
 
 ## Deploy Dokploy
 
@@ -19,11 +19,12 @@ Sessões de provedor: **AES-256-GCM** at rest. Tokens MCP: só hash no banco.
 - Dockerfile path: `Dockerfile` (raiz)
 - Port: `3000`
 - Healthcheck: `/api/health`
+- Persist volume em `/app/data` (arquivo SQLite)
 
 Env obrigatórias:
 
 ```
-DATABASE_URL=postgresql://...
+DATABASE_URL=file:/app/data/civiclink.db
 AUTH_SECRET=...
 AUTH_URL=https://seu-dominio
 APP_URL=https://seu-dominio
@@ -36,17 +37,15 @@ Dev local (pnpm, na raiz do repo):
 pnpm install
 pnpm --filter civiclink-web exec playwright install chromium
 cp web/.env.example web/.env   # preencha AUTH_SECRET e SESSION_ENCRYPTION_KEY
-docker compose up -d db
 pnpm db:migrate
 pnpm dev
 ```
 
-Local com compose (app + postgres):
+Local com compose:
 
 ```bash
 docker compose up --build
 ```
-
 
 ## Legado
 

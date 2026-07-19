@@ -59,9 +59,9 @@ export function createUserMcpServer(userId: string): McpServer {
             ? {
                 OR: [
                   { externalId: { contains: busca } },
-                  { title: { contains: busca, mode: "insensitive" } },
-                  { status: { contains: busca, mode: "insensitive" } },
-                  { notes: { contains: busca, mode: "insensitive" } },
+                  { title: { contains: busca } },
+                  { status: { contains: busca } },
+                  { notes: { contains: busca } },
                 ],
               }
             : {}),

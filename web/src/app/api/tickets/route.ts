@@ -20,8 +20,8 @@ export async function GET(req: Request) {
         ? {
             OR: [
               { externalId: { contains: q } },
-              { title: { contains: q, mode: "insensitive" } },
-              { status: { contains: q, mode: "insensitive" } },
+              { title: { contains: q } },
+              { status: { contains: q } },
             ],
           }
         : {}),

@@ -29,7 +29,9 @@ ENV HOSTNAME=0.0.0.0
 ENV PLAYWRIGHT_HEADLESS=true
 
 RUN addgroup --system --gid 1001 nodejs \
-  && adduser --system --uid 1001 nextjs
+  && adduser --system --uid 1001 nextjs \
+  && mkdir -p /app/data \
+  && chown nextjs:nodejs /app/data
 
 COPY --from=builder /app/web/public ./public
 COPY --from=builder /app/web/prisma ./prisma
@@ -47,6 +49,8 @@ COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 COPY web/docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh \
   && chown nextjs:nodejs /app/docker-entrypoint.sh
+
+ENV DATABASE_URL=file:/app/data/civiclink.db
 
 USER nextjs
 EXPOSE 3000

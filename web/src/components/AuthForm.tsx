@@ -28,8 +28,10 @@ export function AuthForm({ mode }: { mode: Mode }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password, name: name || undefined }),
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Falha no cadastro");
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        if (!res.ok) {
+          throw new Error(data?.error || `Falha no cadastro (${res.status})`);
+        }
       }
 
       const result = await signIn("credentials", {

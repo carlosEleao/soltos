@@ -1,4 +1,4 @@
-import { chromium, type Browser } from "playwright";
+import { chromium, type Browser, type Page } from "playwright";
 import type {
   ConnectInput,
   ConnectResult,
@@ -11,12 +11,33 @@ import type {
 const DASHBOARD = "https://protocolo.betha.cloud/#/cidadao/dashboard";
 const MEUS = "https://protocolo.betha.cloud/#/cidadao/meusprotocolos";
 
+/** Suite Betha (JSF) login form — redirected from protocolo.betha.cloud */
+const SEL = {
+  user: '#login\\:iUsuarios, input[name="login:iUsuarios"]',
+  password: '#login\\:senha, input[name="login:senha"]',
+  cpfMode: '#login\\:acessoCpf, input[name="login:acessoCpf"]',
+  submit: '#login\\:btAcessar',
+} as const;
+
 function headless(): boolean {
   return process.env.PLAYWRIGHT_HEADLESS !== "false";
 }
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function digitsOnly(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+function looksLikeCpf(value: string): boolean {
+  return digitsOnly(value).length === 11;
+}
+
+function formatCpf(value: string): string {
+  const d = digitsOnly(value).padStart(11, "0").slice(0, 11);
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
 }
 
 async function withBrowser<T>(fn: (browser: Browser) => Promise<T>): Promise<T> {
@@ -28,6 +49,129 @@ async function withBrowser<T>(fn: (browser: Browser) => Promise<T>): Promise<T> 
     return await fn(browser);
   } finally {
     await browser.close();
+  }
+}
+
+async function waitForSuiteLogin(page: Page): Promise<boolean> {
+  // Prefer the real JSF fields — URL can bounce through oauth before login.faces
+  try {
+    await page.locator(SEL.user).first().waitFor({ state: "visible", timeout: 60_000 });
+    await page.locator(SEL.password).first().waitFor({ state: "visible", timeout: 15_000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function suiteBethaLogin(
+  page: Page,
+  login: string,
+  password: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const found = await waitForSuiteLogin(page);
+  if (!found) {
+    return {
+      ok: false,
+      message:
+        "Não encontrei o formulário da Suite Betha (campos login:iUsuarios / senha). Tente novamente.",
+    };
+  }
+
+  const user = page.locator(SEL.user).first();
+  const pass = page.locator(SEL.password).first();
+  const cpfMode = page.locator(SEL.cpfMode).first();
+
+  if (looksLikeCpf(login)) {
+    if ((await cpfMode.count()) > 0) {
+      const checked = await cpfMode.isChecked().catch(() => false);
+      if (!checked) {
+        // Label click is more reliable on JSF than input.check()
+        const label = page.locator('label[for="login:acessoCpf"]');
+        if ((await label.count()) > 0) {
+          await label.click();
+        } else {
+          await cpfMode.click({ force: true });
+        }
+        await sleep(600);
+      }
+    }
+    await user.click();
+    await user.fill("");
+    await user.fill(formatCpf(login));
+  } else {
+    if ((await cpfMode.count()) > 0) {
+      const checked = await cpfMode.isChecked().catch(() => false);
+      if (checked) {
+        await cpfMode.click({ force: true });
+        await sleep(400);
+      }
+    }
+    await user.fill(login.trim());
+  }
+
+  await pass.fill(password);
+
+  const submit = page.locator(SEL.submit).first();
+  if ((await submit.count()) > 0 && (await submit.isVisible().catch(() => false))) {
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 45_000 }).catch(() => null),
+      submit.click(),
+    ]);
+  } else {
+    const byRole = page.getByRole("link", { name: /^Acessar$/i }).first();
+    if ((await byRole.count()) > 0) {
+      await Promise.all([
+        page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 45_000 }).catch(() => null),
+        byRole.click(),
+      ]);
+    } else {
+      await pass.press("Enter");
+      await sleep(3000);
+    }
+  }
+
+  await sleep(1500);
+
+  const url = page.url().toLowerCase();
+  const body = (await page.content()).toLowerCase();
+  if (
+    body.includes("senha inválida") ||
+    body.includes("senha invalida") ||
+    body.includes("usuário ou senha") ||
+    body.includes("usuario ou senha") ||
+    body.includes("dados inválidos") ||
+    body.includes("acesso negado")
+  ) {
+    return { ok: false, message: "Usuário/CPF ou senha inválidos na Suite Betha." };
+  }
+
+  if (
+    (url.includes("login.betha.cloud") || url.includes("servicelogin")) &&
+    (await page.locator(SEL.password).first().isVisible().catch(() => false))
+  ) {
+    return {
+      ok: false,
+      message:
+        "Login não confirmado. Verifique CPF/senha ou complete 2FA na Central Betha e tente de novo.",
+    };
+  }
+
+  return { ok: true };
+}
+
+async function maybeSelectEntity(page: Page, cityOrEntity?: string): Promise<void> {
+  const label =
+    !cityOrEntity || cityOrEntity === "estancia-velha-rs"
+      ? /Est[âa]ncia\s+Velha/i
+      : new RegExp(cityOrEntity.replace(/[-_/]/g, "[\\s\\-_]*"), "i");
+
+  const entity = page.getByText(label).first();
+  try {
+    await entity.waitFor({ state: "visible", timeout: 5_000 });
+    await entity.click();
+    await sleep(1500);
+  } catch {
+    /* entity already bound / no picker */
   }
 }
 
@@ -98,78 +242,42 @@ export const bethaPrefeitura: ProviderAdapter = {
         const context = await browser.newContext({
           locale: "pt-BR",
           viewport: { width: 1280, height: 800 },
+          userAgent:
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         });
         const page = await context.newPage();
-        await page.goto(DASHBOARD, { waitUntil: "domcontentloaded", timeout: 60_000 });
-        await sleep(2000);
+        await page.goto(DASHBOARD, { waitUntil: "networkidle", timeout: 90_000 }).catch(async () => {
+          await page.goto(DASHBOARD, { waitUntil: "domcontentloaded", timeout: 60_000 });
+        });
 
-        // Betha usually redirects to Central do Usuário / OAuth form
-        const emailSel = [
-          'input[type="email"]',
-          'input[name="username"]',
-          'input[name="email"]',
-          'input[placeholder*="mail" i]',
-          'input[placeholder*="usuário" i]',
-          'input[placeholder*="usuario" i]',
-        ];
-        const passSel = ['input[type="password"]', 'input[name="password"]'];
-
-        let filled = false;
-        for (const sel of emailSel) {
-          const loc = page.locator(sel).first();
-          if ((await loc.count()) > 0) {
-            await loc.fill(input.login);
-            filled = true;
-            break;
-          }
-        }
-        for (const sel of passSel) {
-          const loc = page.locator(sel).first();
-          if ((await loc.count()) > 0) {
-            await loc.fill(input.password);
-            filled = true;
-            break;
-          }
+        const loginResult = await suiteBethaLogin(page, input.login, input.password);
+        if (!loginResult.ok) {
+          await context.close();
+          return { ok: false, message: loginResult.message };
         }
 
-        if (!filled) {
-          return {
-            ok: false,
-            message:
-              "Não encontrei o formulário de login da Betha. Tente novamente em alguns minutos.",
-          };
-        }
-
-        for (const sel of [
-          'button[type="submit"]',
-          'button:has-text("Entrar")',
-          'button:has-text("Login")',
-          'input[type="submit"]',
-        ]) {
-          const btn = page.locator(sel).first();
-          if ((await btn.count()) > 0) {
-            await btn.click();
-            break;
-          }
-        }
-
-        await sleep(4000);
+        await maybeSelectEntity(page, input.cityOrEntity);
         await page.goto(DASHBOARD, { waitUntil: "domcontentloaded", timeout: 60_000 });
         await sleep(2500);
+        await maybeSelectEntity(page, input.cityOrEntity);
 
         const url = page.url().toLowerCase();
         const body = (await page.content()).toLowerCase();
+        const formStillVisible =
+          (await page.locator(SEL.user).count()) > 0 &&
+          (await page.locator(SEL.password).isVisible().catch(() => false));
         const stillLogin =
-          url.includes("login") ||
-          url.includes("auth") ||
-          url.includes("autoriz") ||
-          (body.includes("senha") && body.includes("entrar"));
+          url.includes("login.betha.cloud") ||
+          url.includes("servicelogin") ||
+          formStillVisible ||
+          (body.includes("fazer login") && body.includes("suite betha"));
 
         if (stillLogin) {
+          await context.close();
           return {
             ok: false,
             message:
-              "Login não confirmado. Verifique usuário/senha ou complete 2FA na Central Betha e tente de novo.",
+              "Login não confirmado. Verifique CPF/senha ou complete 2FA na Central Betha e tente de novo.",
           };
         }
 
@@ -183,9 +291,11 @@ export const bethaPrefeitura: ProviderAdapter = {
             storageState,
             meta: {
               connectedAt: new Date().toISOString(),
-              loginHint: input.login.includes("@")
-                ? input.login.split("@")[0]
-                : input.login.slice(0, 3) + "***",
+              loginHint: looksLikeCpf(input.login)
+                ? `${digitsOnly(input.login).slice(0, 3)}***`
+                : input.login.includes("@")
+                  ? input.login.split("@")[0]
+                  : `${input.login.slice(0, 3)}***`,
             },
           },
           displayName: "Betha Protocolo",
