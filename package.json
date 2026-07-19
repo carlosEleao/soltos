@@ -10,5 +10,5 @@
     "db:generate": "pnpm --filter civiclink-web db:generate",
     "db:migrate": "pnpm --filter civiclink-web db:migrate",
     "db:push": "pnpm --filter civiclink-web db:push"
-  },
+  }
 }
