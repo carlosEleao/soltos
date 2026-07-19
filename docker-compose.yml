@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: civic
+      POSTGRES_PASSWORD: civic
+      POSTGRES_DB: civiclink
+    ports:
+      - "5432:5432"
+    volumes:
+      - civiclink_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U civic -d civiclink"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      APP_URL: http://localhost:3000
+      AUTH_URL: http://localhost:3000
+      AUTH_SECRET: local-dev-change-me-please-use-long-secret
+      DATABASE_URL: postgresql://civic:civic@db:5432/civiclink?schema=public
+      SESSION_ENCRYPTION_KEY: ${SESSION_ENCRYPTION_KEY:-NoicjhmNNauqAWEul+GimuTew7JWlfbiIdMwtxEVbRU=}
+      PLAYWRIGHT_HEADLESS: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  civiclink_pg:

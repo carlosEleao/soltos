@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "protocolos-estancia-velha": {
+      "command": "/caminho/absoluto/para/protocolos/.venv/bin/python",
+      "args": [
+        "/caminho/absoluto/para/protocolos/mcp_server.py",
+        "--transport",
+        "stdio"
+      ],
+      "env": {
+        "PYTHONPATH": "/caminho/absoluto/para/protocolos"
+      }
+    }
+  }
+}

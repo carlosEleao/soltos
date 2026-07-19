@@ -1,0 +1,1 @@
+"""App local para cadastrar, listar e sincronizar protocolos da Prefeitura de Estância Velha."""

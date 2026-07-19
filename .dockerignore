@@ -1,0 +1,14 @@
+**/node_modules
+**/.next
+**/data
+**/.venv
+**/__pycache__
+**/.git
+**/.env
+**/.env.*
+!**/.env.example
+protocolos/.venv
+web/.venv
+*.md
+!web/README.md
+template.json

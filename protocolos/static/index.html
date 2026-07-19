@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Protocolos · Estância Velha</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <h1 class="brand">Protocolos <span>Estância Velha</span></h1>
+      <p class="lede">
+        Cadastre e acompanhe seus protocolos locais, com sincronização automática
+        no Portal Betha quando a sessão estiver autenticada.
+      </p>
+      <div class="toolbar" id="links"></div>
+    </header>
+
+    <div class="layout">
+      <aside class="panel">
+        <h2>Novo protocolo</h2>
+        <form class="form" id="form-create">
+          <div class="row2">
+            <label>Número
+              <input name="numero" required placeholder="ex: 1234" />
+            </label>
+            <label>Ano
+              <input name="ano" type="number" required min="2000" max="2100" />
+            </label>
+          </div>
+          <div class="row2">
+            <label>Dígito
+              <input name="digito" placeholder="opcional" />
+            </label>
+            <label>CPF/CNPJ
+              <input name="requerente_cpf" placeholder="para consulta" />
+            </label>
+          </div>
+          <label>Assunto
+            <input name="assunto" placeholder="resumo do pedido" />
+          </label>
+          <label>Status
+            <input name="status" placeholder="em análise, deferido..." />
+          </label>
+          <label>Notas
+            <textarea name="notas" placeholder="lembretes internos"></textarea>
+          </label>
+          <button class="primary" type="submit">Salvar</button>
+        </form>
+
+        <hr style="border:0;border-top:1px solid var(--line);margin:18px 0" />
+
+        <h2>Automação</h2>
+        <div class="checks">
+          <label><input type="checkbox" id="headed" /> Janela visível (login)</label>
+        </div>
+        <div class="toolbar" style="margin-top:12px">
+          <button id="btn-sync" type="button">Sincronizar meus protocolos</button>
+          <button id="btn-consulta" type="button">Consultar selecionado</button>
+        </div>
+        <p class="hint">
+          A sync abre o Protocolo Betha Cloud, captura a API do cidadão e grava aqui.
+          No primeiro uso, marque “Janela visível” e faça login na conta Betha.
+          Se aparecer captcha, complete no portal oficial.
+        </p>
+      </aside>
+
+      <section class="panel">
+        <h2>Meus protocolos</h2>
+        <div class="search">
+          <input id="busca" placeholder="Buscar por número, assunto, status..." />
+          <button id="btn-reload" type="button">Atualizar</button>
+        </div>
+        <div class="list" id="lista"></div>
+      </section>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
