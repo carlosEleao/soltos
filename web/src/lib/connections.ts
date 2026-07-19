@@ -3,6 +3,7 @@ import { decryptSession, encryptSession } from "@/lib/crypto";
 import { getProvider } from "@/lib/providers/registry";
 import type { ProviderSession } from "@/lib/providers/types";
 import type { Connection, Prisma } from "@prisma/client";
+import { ticketYearKey } from "@/lib/tickets";
 
 export function connectionSession(connection: Connection): ProviderSession | null {
   if (
@@ -149,13 +150,14 @@ export async function syncConnection(userId: string, connectionId: string) {
 
   if (result.ok) {
     for (const item of result.items) {
+      const year = ticketYearKey(item.year);
       await prisma.ticket.upsert({
         where: {
           userId_providerKey_externalId_year: {
             userId,
             providerKey: connection.providerKey,
             externalId: item.externalId,
-            year: item.year ?? 0,
+            year,
           },
         },
         create: {
@@ -163,7 +165,7 @@ export async function syncConnection(userId: string, connectionId: string) {
           connectionId: connection.id,
           providerKey: connection.providerKey,
           externalId: item.externalId,
-          year: item.year ?? null,
+          year,
           digit: item.digit ?? null,
           title: item.title ?? null,
           status: item.status ?? null,

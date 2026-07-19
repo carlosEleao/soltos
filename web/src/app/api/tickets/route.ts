@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { ticketYearKey } from "@/lib/tickets";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -54,20 +55,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
   }
 
+  const year = ticketYearKey(parsed.data.year);
   const ticket = await prisma.ticket.upsert({
     where: {
       userId_providerKey_externalId_year: {
         userId: session.user.id,
         providerKey: parsed.data.providerKey,
         externalId: parsed.data.externalId,
-        year: parsed.data.year ?? 0,
+        year,
       },
     },
     create: {
       userId: session.user.id,
       providerKey: parsed.data.providerKey,
       externalId: parsed.data.externalId,
-      year: parsed.data.year ?? null,
+      year,
       digit: parsed.data.digit,
       title: parsed.data.title,
       status: parsed.data.status,

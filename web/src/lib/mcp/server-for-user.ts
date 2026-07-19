@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { connectProvider, syncConnection } from "@/lib/connections";
 import { listProviders } from "@/lib/providers/registry";
 import { env } from "@/lib/env";
+import { ticketYearKey } from "@/lib/tickets";
 
 function json(data: unknown): string {
   return JSON.stringify(data, null, 2);
@@ -90,20 +91,21 @@ export function createUserMcpServer(userId: string): McpServer {
       },
     },
     async (input) => {
+      const year = ticketYearKey(input.year);
       const ticket = await prisma.ticket.upsert({
         where: {
           userId_providerKey_externalId_year: {
             userId,
             providerKey: input.providerKey,
             externalId: input.externalId,
-            year: input.year ?? 0,
+            year,
           },
         },
         create: {
           userId,
           providerKey: input.providerKey,
           externalId: input.externalId,
-          year: input.year ?? null,
+          year,
           digit: input.digit ?? null,
           title: input.title ?? null,
           status: input.status ?? "aberto",
@@ -134,20 +136,21 @@ export function createUserMcpServer(userId: string): McpServer {
       },
     },
     async (input) => {
+      const year = ticketYearKey(input.year);
       const ticket = await prisma.ticket.upsert({
         where: {
           userId_providerKey_externalId_year: {
             userId,
             providerKey: input.providerKey,
             externalId: input.externalId,
-            year: input.year ?? 0,
+            year,
           },
         },
         create: {
           userId,
           providerKey: input.providerKey,
           externalId: input.externalId,
-          year: input.year ?? null,
+          year,
           title: input.title ?? null,
           status: "aberto",
           notes: input.notes ?? null,

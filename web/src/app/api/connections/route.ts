@@ -50,11 +50,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
   }
 
-  // Password is used only in-memory for the embedded login, never persisted.
-  const result = await connectProvider({
-    userId: session.user.id,
-    ...parsed.data,
-  });
+  try {
+    // Password is used only in-memory for the embedded login, never persisted.
+    const result = await connectProvider({
+      userId: session.user.id,
+      ...parsed.data,
+    });
 
-  return NextResponse.json(result, { status: result.ok ? 200 : 400 });
+    return NextResponse.json(result, { status: result.ok ? 200 : 400 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Erro ao conectar" },
+      { status: 400 },
+    );
+  }
 }
